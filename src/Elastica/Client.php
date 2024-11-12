@@ -19,6 +19,7 @@ use Elastica\Request;
 use Elastica\Response;
 use FOS\ElasticaBundle\Logger\ElasticaLogger;
 use Symfony\Component\Stopwatch\Stopwatch;
+use Psr\Log\LoggerInterface;
 
 /**
  * Extends the default Elastica client to provide logging for errors that occur
@@ -48,6 +49,11 @@ class Client extends BaseClient
      * @var Stopwatch|null
      */
     private $stopwatch;
+
+    public function setLogger(LoggerInterface $logger): void
+    {
+        $this->_logger = $logger;
+    }
 
     /**
      * @param array<mixed> $data
