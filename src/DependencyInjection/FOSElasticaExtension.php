@@ -159,7 +159,7 @@ class FOSElasticaExtension extends Extension
             $clientDef->replaceArgument(0, $clientConfig);
             $clientDef->replaceArgument(1, null);
 
-            $logger = $clientConfig['connections'][0]['logger'];
+            $logger = $clientConfig['logger'];
             if (false !== $logger) {
                 $clientDef->addMethodCall('setLogger', [new Reference($logger)]);
             }
