@@ -336,36 +336,39 @@ class Configuration implements ConfigurationInterface
                         // If there is no connections array key defined, assume a single connection.
                         ->beforeNormalization()
                         ->ifTrue(function ($v) {
-                            return \is_array($v) && !\array_key_exists('connections', $v);
+                            return \is_array($v) && !\array_key_exists('hosts', $v);
                         })
                         ->then(function ($v) {
                             return [
-                                'connections' => [$v],
+                                'hosts' => [$v],
                             ];
                         })
                         ->end()
                         ->children()
-                            ->arrayNode('connections')
-                                ->requiresAtLeastOneElement()
-                                ->prototype('array')
-                                    ->fixXmlConfig('header')
-                                    ->children()
-                                        ->scalarNode('url')
-                                            ->validate()
-                                                ->ifTrue(function ($url) {
-                                                    return $url && '/' !== \substr($url, -1);
-                                                })
-                                                ->then(function ($url) {
-                                                    return $url.'/';
-                                                })
+                            // ->arrayNode('connections')
+                            //     ->requiresAtLeastOneElement()
+                            //     ->prototype('array')
+                            //         ->fixXmlConfig('header')
+                            //         ->children()
+                                        ->arrayNode('hosts')
+                                            ->requiresAtLeastOneElement()
+                                            ->scalarPrototype()
+                                                ->validate()
+                                                    ->ifTrue(function ($url) {
+                                                        return $url && '/' !== \substr($url, -1);
+                                                    })
+                                                    ->then(function ($url) {
+                                                        return $url.'/';
+                                                    })
+                                                ->end()
                                             ->end()
                                         ->end()
                                         ->scalarNode('username')->end()
                                         ->scalarNode('password')->end()
-                                        ->scalarNode('host')->end()
-                                        ->scalarNode('port')->end()
-                                        ->scalarNode('proxy')->end()
-                                        ->scalarNode('auth_type')->end()
+                                        // ->scalarNode('host')->end()
+                                        // ->scalarNode('port')->end()
+                                        // ->scalarNode('proxy')->end()
+                                        // ->scalarNode('auth_type')->end()
                                         ->arrayNode('http_error_codes')
                                             ->beforeNormalization()
                                                 ->ifTrue(function ($v) { return !\is_array($v); })
@@ -404,9 +407,9 @@ class Configuration implements ConfigurationInterface
                                             ->defaultValue(0)
                                         ->end()
                                         ->booleanNode('persistent')->defaultValue(true)->end()
-                                    ->end()
-                                ->end()
-                            ->end()
+                            //         ->end()
+                            //     ->end()
+                            // ->end()
                             ->scalarNode('timeout')->end()
                             ->scalarNode('connectTimeout')->end()
                             ->scalarNode('headers')->end()
