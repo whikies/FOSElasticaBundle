@@ -74,7 +74,7 @@ class Client extends BaseClient
                 $request->getUri()->getPath(),
                 $request->getMethod(),
                 \json_decode($request->getBody()->__toString(), true),
-                $request->getUri()->getQuery(),
+                $request->getUri()->getQuery() ?? '',
                 0,
                 0,
                 0
@@ -90,7 +90,7 @@ class Client extends BaseClient
                 $request->getUri()->getPath(),
                 $request->getMethod(),
                 \json_decode($request->getBody()->__toString(), true),
-                $request->getUri()->getQuery(),
+                $request->getUri()->getQuery() ?? '',
                 $end - $start,
                 $responseData['took'],
                 $responseData['hits']['total']['value'] ?? 0
@@ -100,7 +100,7 @@ class Client extends BaseClient
                 $request->getUri()->getPath(),
                 $request->getMethod(),
                 \json_decode($request->getBody()->__toString(), true),
-                $request->getUri()->getQuery(),
+                $request->getUri()->getQuery() ?? '',
                 $end - $start,
                 0,
                 0
