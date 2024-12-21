@@ -11,6 +11,9 @@
 
 namespace FOS\ElasticaBundle\Elastica;
 
+use Elastic\Elasticsearch\Exception\ServerResponseException;
+use Elastic\Elasticsearch\Response\Elasticsearch;
+use Elastic\Transport\Exception\NoNodeAvailableException;
 use Elastica\Client as BaseClient;
 use Elastica\Exception\ClientException;
 use Elastica\Exception\ExceptionInterface;
@@ -20,6 +23,7 @@ use Elastica\Response;
 use FOS\ElasticaBundle\Logger\ElasticaLogger;
 use Symfony\Component\Stopwatch\Stopwatch;
 use Psr\Log\LoggerInterface;
+use Psr\Http\Message\RequestInterface;
 
 /**
  * Extends the default Elastica client to provide logging for errors that occur
@@ -55,46 +59,59 @@ class Client extends BaseClient
         $this->_logger = $logger;
     }
 
-    /**
-     * @param array<mixed> $data
-     * @param array<mixed> $query
-     */
-    public function request(string $path, string $method = Request::GET, $data = [], array $query = [], string $contentType = Request::DEFAULT_CONTENT_TYPE): Response
+    public function sendRequest(RequestInterface $request): Elasticsearch
     {
         if ($this->stopwatch) {
             $this->stopwatch->start('es_request', 'fos_elastica');
         }
 
         try {
-            $response = parent::request($path, $method, $data, $query, $contentType);
-        } catch (ExceptionInterface $e) {
-            $this->logQuery($path, $method, $data, $query, 0, 0, 0);
+            $start = \microtime(true);
+            $result = parent::sendRequest($request);
+            $end = \microtime(true);
+        } catch (ServerResponseException | NoNodeAvailableException $e) {
+            $this->logQuery(
+                $request->getUri()->getPath(),
+                $request->getMethod(),
+                \json_decode($request->getBody()->__toString(), true),
+                $request->getUri()->getQuery(),
+                0,
+                0,
+                0
+            );
+
             throw $e;
         }
 
-        $responseData = $response->getData();
-
-        $transportInfo = $response->getTransferInfo();
-        $connection = $this->getLastRequest()->getConnection();
-        $forbiddenHttpCodes = $connection->hasConfig('http_error_codes') ? $connection->getConfig('http_error_codes') : [];
-
-        if (isset($transportInfo['http_code']) && \in_array($transportInfo['http_code'], $forbiddenHttpCodes, true)) {
-            $body = \json_encode($responseData);
-            $message = \sprintf('Error in transportInfo: response code is %s, response body is %s', $transportInfo['http_code'], $body);
-            throw new ClientException($message);
-        }
+        $responseData = $result->asArray();
 
         if (isset($responseData['took'], $responseData['hits'])) {
-            $this->logQuery($path, $method, $data, $query, $response->getQueryTime(), $response->getEngineTime(), $responseData['hits']['total']['value'] ?? 0);
+            $this->logQuery(
+                $request->getUri()->getPath(),
+                $request->getMethod(),
+                \json_decode($request->getBody()->__toString(), true),
+                $request->getUri()->getQuery(),
+                $end - $start,
+                $responseData['took'],
+                $responseData['hits']['total']['value'] ?? 0
+            );
         } else {
-            $this->logQuery($path, $method, $data, $query, $response->getQueryTime(), 0, 0);
+            $this->logQuery(
+                $request->getUri()->getPath(),
+                $request->getMethod(),
+                \json_decode($request->getBody()->__toString(), true),
+                $request->getUri()->getQuery(),
+                $end - $start,
+                0,
+                0
+            );
         }
 
         if ($this->stopwatch) {
             $this->stopwatch->stop('es_request');
         }
 
-        return $response;
+        return $result;
     }
 
     public function getIndex(string $name): BaseIndex
@@ -124,23 +141,24 @@ class Client extends BaseClient
      * Log the query if we have an instance of ElasticaLogger.
      *
      * @param array<mixed>|string $data
-     * @param array<mixed>        $query
+     * @param string              $query
      * @param float               $queryTime
      * @param int                 $engineMS
      */
-    private function logQuery(string $path, string $method, $data, array $query, $queryTime, $engineMS = 0, int $itemCount = 0): void
+    private function logQuery(string $path, string $method, $data, string $query, $queryTime, $engineMS = 0, int $itemCount = 0): void
     {
         if (!$this->_logger instanceof ElasticaLogger) {
             return;
         }
 
-        $connection = $this->getLastRequest()->getConnection();
+        $uri = $this->getTransport()->getLastRequest()->getUri();
+        $config = $this->getConfig();
 
         $connectionArray = [
-            'host' => $connection->getHost(),
-            'port' => $connection->getPort(),
-            'transport' => $connection->getTransport(),
-            'headers' => $connection->hasConfig('headers') ? $connection->getConfig('headers') : [],
+            'host' => $uri->getHost(),
+            'port' => $uri->getPort(),
+            'transport' => $config['transport_config'] ?? [],
+            'headers' => $this->getLastRequest()->getHeaders(),
         ];
 
         $this->_logger->logQuery($path, $method, $data, $queryTime, $connectionArray, $query, $engineMS, $itemCount);
